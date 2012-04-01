@@ -1,0 +1,3 @@
+[submodule "vendor/node-lru-cache"]
+	path = vendor/node-lru-cache
+	url = git://github.com/cblage/node-lru-cache.git
