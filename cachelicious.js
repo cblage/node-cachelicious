@@ -42,8 +42,6 @@ function CacheStream(size) {
 	this.activeRequestCount = 0;
 	this.requestServer = null;
 	this.writable = true;
-	this.chunkSize = 1024 * 1024; //2MB
-	//console.log('initialized buffer with size:' + this.size);
 }
 
 util.inherits(CacheStream, events.EventEmitter);
@@ -77,14 +75,11 @@ CacheStream.prototype.emitRequestData = function (requestId)
 
 	//console.log("emitting data for requestId:" + requestId);
 	if (this.activeRequests[requestId].readOffset < this.writeOffset) {
-		var outputMaxByte = Math.min(this.activeRequests[requestId].readOffset + this.chunkSize, this.writeOffset);
-		//console.log('writeOffset: ' + this.writeOffset);
-		//console.log('outputMaxbyte:' + outputMaxByte);
 		this.emit(
 			requestId+"data", 
-			this.buffer.slice(this.activeRequests[requestId].readOffset, outputMaxByte)
+			this.buffer.slice(this.activeRequests[requestId].readOffset, this.writeOffset)
 		);
-		this.activeRequests[requestId].readOffset = outputMaxByte;
+		this.activeRequests[requestId].readOffset = this.writeOffset;
 	}
 	
 	if (this.activeRequests[requestId].readOffset === this.size) {
