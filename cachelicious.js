@@ -122,10 +122,6 @@ CacheStream.prototype.end = function()
 }
 
 
-
-
-
-
 Cachelicious = function (basepath, port, maxCacheSize)
 {
 	this.init(basepath, port, maxCacheSize)
@@ -158,6 +154,7 @@ Cachelicious.prototype = {
 		this.port = port;
 		this.basepath = basepath;
 		this.requestStreamId = 0;
+		this.locked = {};
 		
 		this.server = http.createServer(function (request, response) {
 			self.dispatch(request, response);
@@ -187,33 +184,13 @@ Cachelicious.prototype = {
 		} else {
 			filepath += request.url;
 		}
-				
-		//console.log('filepath:' + filepath)
-		fs.stat(filepath, function (error, stat) {
-			if (null !== error) {
-				self.serveError(404, response);
-				return;
-			}
-			
-			if (undefined === stat) {
-				self.serveError(500, response);
-				return;				
-			}
-			
-			if (!stat.isFile()) {
-				self.serveError(401, response);
-				return;				
-			}			
-			
-			//console.log(stat);
-			
-			self.servePath(filepath, stat.size, response);
-		});
-	}, 
+		
+		self.servePath(filepath, response);		
+	},
 	
-	servePath: function (filepath, size, response)
+	servePath: function (filepath, response)
 	{
-		var extname = path.extname(filepath).toLowerCase();
+		var extname = path.extname(filepath).toLowerCase(), self = this;
 		var contentType;
 		
 		switch (extname) {
@@ -232,51 +209,123 @@ Cachelicious.prototype = {
 				break;
 		}
 
-		response.writeHead(200, {
-			'Content-Type':   contentType,
-			'Content-Length': size
-		});
-		this.streamPath(filepath, size, response);
+		this.streamPath(filepath, contentType, response);
 	},
 	
-	uncachedStream: function (filepath, response)
+	fileCheck: function (filepath, callback) 
 	{
-		var readStream = fs.createReadStream(filepath);
-		readStream.pipe(response);
+		console.log('running stat on:' + filepath)
+		fs.stat(filepath, function (error, stat) {
+			if (null !== error) {
+				self.serveError(404, response);
+				return;
+			}
+
+			if (undefined === stat) {
+				self.serveError(500, response);
+				return;				
+			}
+
+			if (!stat.isFile()) {
+				self.serveError(401, response);
+				return;				
+			}			
+			callback(stat);
+		});				
 	},
 	
-	streamPath: function (filepath, size, response)
+	uncachedStream: function (filepath, contentType, response)
+	{
+		this.fileCheck(filepath, function (stat) {
+			response.writeHead(200, {
+				'Content-Type':   contentType,
+				'Content-Length': stat.size
+			});
+
+			fs.createReadStream(filepath).pipe(response);						
+		});
+	},
+	
+	streamPath: function (filepath, contentType, response)
 	{
 		if (false === this.cache) {
-			this.uncachedStream(filepath, response);
+			this.serveUncachedStream(filepath, contentType, response);
+			return;
+		}
+
+		this.requestStreamId++;
+		
+		var
+			requestId = "r-" + this.requestStreamId, 
+			cachedStream = this.getCached(filepath),
+			self = this;
+
+		if (undefined !== cachedStream) {
+			self.asyncServeCachedStream(cachedStream, contentType, requestId, response);
 			return;
 		}
 		
-		this.requestStreamId++;
+		if (this.locked[filepath]) {
+			var lockCheck = setInterval(function () {
+				var cachedStream = self.getCached(filepath);
+				//console.log("lock checker for: " + requestId);
+				if (undefined !== cachedStream) {
+					//console.log("stopped checker for: " + requestId);
+					clearInterval(lockCheck);
+					self.asyncServeCachedStream(cachedStream, contentType, requestId, response);						
+				}
+			}, 5);
+			return;
+		}
 		
-		var readStream = this.getCachedReadStream(filepath, size), requestId = "r-" + this.requestStreamId;
+		this.locked[filepath] = true;
+		this.fileCheck(filepath, function (stat) {
+			var newStream = new CacheStream(stat.size);
+			self.setCached(filepath, newStream);
+			fs.createReadStream(filepath).pipe(newStream);
+			delete self.locked[filepath];
+			self.asyncServeCachedStream(newStream, contentType, requestId, response);	
+		});
+	},
+	
+	asyncServeCachedStream: function (cachedStream, contentType, requestId, response)  
+	{
+		var self = this;
+		setTimeout(function () {
+			self.serveCachedStream(cachedStream, contentType, requestId, response);
+		}, 0);
+	},
+	
+	serveCachedStream: function (cachedStream, contentType, requestId, response) 
+	{
+		response.writeHead(200, {
+			'Content-Type':   contentType,
+			'Content-Length': cachedStream.size,
+			'X-Req-Id':       requestId
+		});
 
+		cachedStream.register(requestId);
 
-		readStream.register(requestId);
-		
-		readStream.on(requestId+'data', function(data) {
-			//console.log(requestId + "Streaming data back to client")
-			
-			var flushed = response.write(data);
+		cachedStream.on(requestId+'data', function(data) {
+			//console.log(requestId + ":Streaming data back to client")
+
 			// Pause the read stream when the write stream gets saturated
-			if(!flushed) {
-				readStream.pause(requestId);	
+			if(false === response.write(data)) {
+				//console.log(requestId + ": Pausing stream...")
+				cachedStream.pause(requestId);	
 			}
 		});
 
 		response.on('drain', function() {
+			//console.log(requestId + ': response drained');
 			// Resume the read stream when the write stream gets hungry 
-			readStream.resume(requestId);
+			cachedStream.resume(requestId);
 		});
 
-		readStream.on(requestId+'end', function() {
+		cachedStream.on(requestId+'end', function() {
 			response.end();
-		});
+			//console.log(requestId + ': response ended');
+		});		
 	},
 	
 	serveError: function (code, response) 
@@ -286,28 +335,14 @@ Cachelicious.prototype = {
 		response.end(""+code, 'utf-8');		
 	},
 	
-	getCachedReadStream: function (filepath, size) 
-	{
-		var cacheStream = this.getCached(filepath), self = this;
-		if (false === cacheStream || undefined === cacheStream) {
-			cacheStream = new CacheStream(size);
-			this.setCached(filepath, cacheStream);
-			
-			var fileReadSteam = fs.createReadStream(filepath);
-			fileReadSteam.pipe(cacheStream);
-		}
-		
-		return cacheStream;
-	},
-	
 	getCached: function (filepath) 
 	{
 		var cacheStream = this.cache.get(filepath);
-		if (undefined === cacheStream) {
+		/*if (undefined === cacheStream) {
 			//console.log("MISS!");
 		} else {
 			//console.log("HIT!");
-		}
+		}*/
 		return cacheStream;
 	},
 	
