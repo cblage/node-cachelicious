@@ -75,18 +75,8 @@ CacheStream.prototype.emitRequestData = function (requestId)
 		return;
 	}
 
-	var currTime = (new Date()).getTime(),
-		sinceLastEmit = currTime - this.activeRequests[requestId].lastEmit;
 	//console.log("emitting data for requestId:" + requestId);
 	if (this.activeRequests[requestId].readOffset < this.writeOffset) {
-	/*	if (sinceLastEmit < this.maxEmitPeriod) {
-			console.log(requestId + ': max emit period:' + this.maxEmitPeriod);
-			console.log(requestId + ': time since last emit:' + sinceLastEmit);
-			console.log(requestId + ': skipping emit for busting max freq');
-			return;
-		}
-	*/
-
 		var outputMaxByte = Math.min(this.activeRequests[requestId].readOffset + this.chunkSize, this.writeOffset);
 		//console.log('writeOffset: ' + this.writeOffset);
 		//console.log('outputMaxbyte:' + outputMaxByte);
@@ -95,7 +85,6 @@ CacheStream.prototype.emitRequestData = function (requestId)
 			this.buffer.slice(this.activeRequests[requestId].readOffset, outputMaxByte)
 		);
 		this.activeRequests[requestId].readOffset = outputMaxByte;
-		this.activeRequests[requestId].lastEmit = currTime;
 	}
 	
 	if (this.activeRequests[requestId].readOffset === this.size) {
