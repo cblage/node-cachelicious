@@ -14,7 +14,7 @@ function CacheStream(size) {
 	this.activeRequests = {};
 	this.activeRequestCount = 0;
 	this.requestServer = null;
-	this.endendWriting = false;
+	this.writable = true;
 	//console.log('initialized buffer with size:' + this.size);
 }
 
@@ -96,7 +96,7 @@ CacheStream.prototype.resume = function (requestId)
 
 CacheStream.prototype.write = function(data) 
 {
-	if (this.endendWriting) {
+	if (!this.writable) {
 		//console.log("rejecting write because we ended already")
 		return;
 	}
@@ -118,7 +118,7 @@ CacheStream.prototype.write = function(data)
 CacheStream.prototype.end = function() 
 {
 	//console.log("ended!");
-	this.endendWriting = true;
+	this.writable = false;
 }
 
 
@@ -146,7 +146,6 @@ Cachelicious.prototype = {
 		if (typeof maxCacheSize === 'undefined') {
 			maxCacheSize = 20971520; //20mb
 		}
-
 		
 		if (maxCacheSize !== false) {
 			this.cache = LRU(maxCacheSize, function (cacheStream) {
@@ -243,22 +242,7 @@ Cachelicious.prototype = {
 	uncachedStream: function (filepath, response)
 	{
 		var readStream = fs.createReadStream(filepath);
-		readStream.on('data', function(data) {
-			var flushed = response.write(data);
-			// Pause the read stream when the write stream gets saturated
-			if(!flushed) {
-				readStream.pause();	
-			}
-		});
-
-		response.on('drain', function() {
-			// Resume the read stream when the write stream gets hungry 
-			readStream.resume();
-		});
-
-		readStream.on('end', function() {
-			response.end();
-		});		
+		readStream.pipe(response);
 	},
 	
 	streamPath: function (filepath, size, response)
@@ -310,15 +294,7 @@ Cachelicious.prototype = {
 			this.setCached(filepath, cacheStream);
 			
 			var fileReadSteam = fs.createReadStream(filepath);
-
-			fileReadSteam.on('data', function (data) {
-				cacheStream.write(data);
-			});
-			
-			fileReadSteam.on('end', function() {
-				cacheStream.end();
-			});
-			
+			fileReadSteam.pipe(cacheStream);
 		}
 		
 		return cacheStream;
