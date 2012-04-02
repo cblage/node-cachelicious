@@ -15,23 +15,29 @@ function CacheStream(size) {
 	this.activeRequestCount = 0;
 	this.requestServer = null;
 	this.endendWriting = false;
-	console.log('initialized buffer with size:' + this.size);
+	//console.log('initialized buffer with size:' + this.size);
 }
 
 util.inherits(CacheStream, events.EventEmitter);
 
-CacheStream.prototype.register = function (requestId) 
+CacheStream.prototype.register = function (requestId, readOffset) 
 {
 	this.activeRequests[requestId] = {
 		paused: false,
-		readOffset: 0,
+		readOffset: (undefined === readOffset ? 0 : readOffset),
 	};
-	console.log("registering requestId:" + requestId);
+	//console.log("registering requestId:" + requestId);
 	
 	if (0 === this.activeRequestCount++) {
 		this.startServingRequests();
 	}
 
+}
+
+CacheStream.prototype.unregister = function (requestId) 
+{
+	this.activeRequestCount--;
+	delete this.activeRequests[requestId];
 }
 
 CacheStream.prototype.startServingRequests = function () 
@@ -57,11 +63,11 @@ CacheStream.prototype.emitRequestData = function (requestId)
 	if (this.activeRequests[requestId].paused || this.activeRequests[requestId].readOffset === this.writeOffset) {
 		return;
 	}
-	console.log("emitting data for requestId:" + requestId);
+	//console.log("emitting data for requestId:" + requestId);
 	var self = this;
 	setTimeout(function () {		
 		if (undefined === self.activeRequests[requestId]) {
-			console.log("abandoning streaming for req that ended before this setimeout:" + requestId);
+			//console.log("abandoning streaming for req that ended before this setimeout:" + requestId);
 			return;
 		}
 		self.emit(
@@ -71,10 +77,9 @@ CacheStream.prototype.emitRequestData = function (requestId)
 		
 		self.activeRequests[requestId].readOffset = self.writeOffset;
 		if (self.activeRequests[requestId].readOffset === self.size) {
-			console.log("ending streaming for req:" + requestId);
+			//console.log("ending streaming for req:" + requestId);
 			self.emit(requestId+"end");
-			self.activeRequestCount--;
-			delete self.activeRequests[requestId];
+			self.unregister(requestId);
 		}
 	}, 0);	
 }
@@ -92,27 +97,27 @@ CacheStream.prototype.resume = function (requestId)
 CacheStream.prototype.write = function(data) 
 {
 	if (this.endendWriting) {
-		console.log("rejecting write because we ended already")
+		//console.log("rejecting write because we ended already")
 		return;
 	}
 	
 	var writtenBytes;
 	if (Buffer.isBuffer(data)) {
-		console.log("writing buffer data " + data.length + " bytes to offset: " + this.writeOffset);
+		//console.log("writing buffer data " + data.length + " bytes to offset: " + this.writeOffset);
 		data.copy(this.buffer, this.writeOffset);
 		writtenBytes = data.length;
 	} else {
-		console.log("writing " + Buffer.byteLength(data) + " bytes to offset: " + this.writeOffset);
+		//console.log("writing " + Buffer.byteLength(data) + " bytes to offset: " + this.writeOffset);
 		writtenBytes = this.buffer.write(data, this.writeOffset);
 	}
 	this.writeOffset+= writtenBytes;
-	console.log("wrote " + writtenBytes + " bytes into buffer");
-	console.log("new offset" + this.writeOffset);		
+	//console.log("wrote " + writtenBytes + " bytes into buffer");
+	//console.log("new offset" + this.writeOffset);		
 }
 
 CacheStream.prototype.end = function() 
 {
-	console.log("ended!");
+	//console.log("ended!");
 	this.endendWriting = true;
 }
 
@@ -141,6 +146,7 @@ Cachelicious.prototype = {
 		if (typeof maxCacheSize === 'undefined') {
 			maxCacheSize = 20971520; //20mb
 		}
+
 		
 		if (maxCacheSize !== false) {
 			this.cache = LRU(maxCacheSize, function (cacheStream) {
@@ -173,7 +179,7 @@ Cachelicious.prototype = {
 	
 	dispatch: function (request, response) 
 	{
-		console.log('request starting...');
+		//console.log('request starting...');
 		var filepath = this.basepath,
 		    self = this;
 		
@@ -183,7 +189,7 @@ Cachelicious.prototype = {
 			filepath += request.url;
 		}
 				
-		console.log('filepath:' + filepath)
+		//console.log('filepath:' + filepath)
 		fs.stat(filepath, function (error, stat) {
 			if (null !== error) {
 				self.serveError(404, response);
@@ -234,17 +240,43 @@ Cachelicious.prototype = {
 		this.streamPath(filepath, size, response);
 	},
 	
+	uncachedStream: function (filepath, response)
+	{
+		var readStream = fs.createReadStream(filepath);
+		readStream.on('data', function(data) {
+			var flushed = response.write(data);
+			// Pause the read stream when the write stream gets saturated
+			if(!flushed) {
+				readStream.pause();	
+			}
+		});
+
+		response.on('drain', function() {
+			// Resume the read stream when the write stream gets hungry 
+			readStream.resume();
+		});
+
+		readStream.on('end', function() {
+			response.end();
+		});		
+	},
+	
 	streamPath: function (filepath, size, response)
 	{
+		if (false === this.cache) {
+			this.uncachedStream(filepath, response);
+			return;
+		}
+		
 		this.requestStreamId++;
 		
-		var readStream = this.getReadStream(filepath, size), requestId = "r-" + this.requestStreamId;
+		var readStream = this.getCachedReadStream(filepath, size), requestId = "r-" + this.requestStreamId;
 
 
 		readStream.register(requestId);
 		
 		readStream.on(requestId+'data', function(data) {
-			console.log(requestId + "Streaming data back to client")
+			//console.log(requestId + "Streaming data back to client")
 			
 			var flushed = response.write(data);
 			// Pause the read stream when the write stream gets saturated
@@ -270,7 +302,7 @@ Cachelicious.prototype = {
 		response.end(""+code, 'utf-8');		
 	},
 	
-	getReadStream: function (filepath, size) 
+	getCachedReadStream: function (filepath, size) 
 	{
 		var cacheStream = this.getCached(filepath), self = this;
 		if (false === cacheStream || undefined === cacheStream) {
@@ -294,18 +326,19 @@ Cachelicious.prototype = {
 	
 	getCached: function (filepath) 
 	{
-		if (this.cache === false) {
-			return false;
+		var cacheStream = this.cache.get(filepath);
+		if (undefined === cacheStream) {
+			//console.log("MISS!");
+		} else {
+			//console.log("HIT!");
 		}
-		return this.cache.get(filepath);
+		return cacheStream;
 	},
 	
 	setCached: function (filepath, cacheStream) 
 	{
-		if (this.cache === false) {
-			return;
-		}
 		this.cache.set(filepath, cacheStream);
+		//console.log('current cache size:' + this.cache.length);
 	},
 	
 
