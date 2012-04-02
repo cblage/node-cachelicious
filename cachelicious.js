@@ -48,7 +48,7 @@ function CacheStream(size) {
 
 util.inherits(CacheStream, events.EventEmitter);
 
-CacheStream.prototype.register = function (requestId, readOffset) 
+CacheStream.prototype.registerReq = function (requestId, readOffset) 
 {
 	var self = this;
 	this.activeRequests[requestId] = {
@@ -63,7 +63,7 @@ CacheStream.prototype.register = function (requestId, readOffset)
 	this.activeRequestCount++;
 }
 
-CacheStream.prototype.unregister = function (requestId) 
+CacheStream.prototype.unregisterReq = function (requestId) 
 {
 	this.activeRequestCount--;
 	delete this.activeRequests[requestId];
@@ -90,7 +90,7 @@ CacheStream.prototype.emitRequestData = function (requestId)
 	if (this.activeRequests[requestId].readOffset === this.size) {
 		//console.log(requestId + ": ended streaming");
 		this.emit(requestId+"end");
-		this.unregister(requestId);
+		this.unregisterReq(requestId);
 	}
 	var self = this;
 	process.nextTick(function () {
@@ -98,14 +98,14 @@ CacheStream.prototype.emitRequestData = function (requestId)
 	})
 }
 
-CacheStream.prototype.pause = function (requestId) 
+CacheStream.prototype.pauseReq = function (requestId) 
 {
 	if (undefined !== this.activeRequests[requestId]) {
 		this.activeRequests[requestId].paused = true;	
 	}
 }
 
-CacheStream.prototype.resume = function (requestId) 
+CacheStream.prototype.resumeReq = function (requestId) 
 {
 	if (undefined !== this.activeRequests[requestId]) {
 		this.activeRequests[requestId].paused = false;
@@ -326,21 +326,21 @@ Cachelicious.prototype = {
 			'X-Req-Id':       requestId
 		});
 
-		cachedStream.register(requestId);
+		cachedStream.registerReq(requestId);
 
 		cachedStream.on(requestId+'data', function(data) {
 			// Pause the read stream when the write stream gets saturated
 			//console.log(requestId + ":Streaming data back to client")
 			if(false === response.write(data)) {
 				//console.log(requestId + ": Pausing stream...")
-				cachedStream.pause(requestId);	
+				cachedStream.pauseReq(requestId);	
 			}
 		});
 
 		response.on('drain', function() {
 			//console.log(requestId + ': response drained');
 			// Resume the read stream when the write stream gets hungry 
-			cachedStream.resume(requestId);
+			cachedStream.resumeReq(requestId);
 		});
 
 		cachedStream.on(requestId+'end', function() {
