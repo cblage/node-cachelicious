@@ -15,6 +15,7 @@ function CacheStream(size) {
 	this.activeRequestCount = 0;
 	this.requestServer = null;
 	this.writable = true;
+	this.chunkSize = 1024 * 1024; //2MB
 	//console.log('initialized buffer with size:' + this.size);
 }
 
@@ -22,16 +23,17 @@ util.inherits(CacheStream, events.EventEmitter);
 
 CacheStream.prototype.register = function (requestId, readOffset) 
 {
+	var self = this;
 	this.activeRequests[requestId] = {
 		paused: false,
-		readOffset: (undefined === readOffset ? 0 : readOffset),
+		readOffset: (undefined === readOffset ? 0 : readOffset)		
 	};
-	//console.log("registering requestId:" + requestId);
 	
-	if (0 === this.activeRequestCount++) {
-		this.startServingRequests();
-	}
-
+	process.nextTick(function () {
+		self.emitRequestData(requestId);
+	})
+	
+	this.activeRequestCount++;
 }
 
 CacheStream.prototype.unregister = function (requestId) 
@@ -40,58 +42,62 @@ CacheStream.prototype.unregister = function (requestId)
 	delete this.activeRequests[requestId];
 }
 
-CacheStream.prototype.startServingRequests = function () 
-{
-	var self = this;
-	this.requestServer = setInterval(function () {
-		if (0 ===	self.activeRequestCount) {
-			clearInterval(self.requestServer);
-			return;
-		}
-		
-		for (var requestId in self.activeRequests) {
-			if (self.activeRequests.hasOwnProperty(requestId)) {
-				self.emitRequestData(requestId);
-			}
-		}
-	}, 0);
-	
-}
-
 CacheStream.prototype.emitRequestData = function (requestId) 
 {
-	if (this.activeRequests[requestId].paused || this.activeRequests[requestId].readOffset === this.writeOffset) {
+	if (undefined === this.activeRequests[requestId] || this.activeRequests[requestId].paused) {
 		return;
 	}
+
+	var currTime = (new Date()).getTime(),
+		sinceLastEmit = currTime - this.activeRequests[requestId].lastEmit;
 	//console.log("emitting data for requestId:" + requestId);
-	var self = this;
-	setTimeout(function () {		
-		if (undefined === self.activeRequests[requestId]) {
-			//console.log("abandoning streaming for req that ended before this setimeout:" + requestId);
+	if (this.activeRequests[requestId].readOffset < this.writeOffset) {
+	/*	if (sinceLastEmit < this.maxEmitPeriod) {
+			console.log(requestId + ': max emit period:' + this.maxEmitPeriod);
+			console.log(requestId + ': time since last emit:' + sinceLastEmit);
+			console.log(requestId + ': skipping emit for busting max freq');
 			return;
 		}
-		self.emit(
+	*/
+
+		var outputMaxByte = Math.min(this.activeRequests[requestId].readOffset + this.chunkSize, this.writeOffset);
+		//console.log('writeOffset: ' + this.writeOffset);
+		//console.log('outputMaxbyte:' + outputMaxByte);
+		this.emit(
 			requestId+"data", 
-			self.buffer.slice(self.activeRequests[requestId].readOffset, self.writeOffset)
+			this.buffer.slice(this.activeRequests[requestId].readOffset, outputMaxByte)
 		);
-		
-		self.activeRequests[requestId].readOffset = self.writeOffset;
-		if (self.activeRequests[requestId].readOffset === self.size) {
-			//console.log("ending streaming for req:" + requestId);
-			self.emit(requestId+"end");
-			self.unregister(requestId);
-		}
-	}, 0);	
+		this.activeRequests[requestId].readOffset = outputMaxByte;
+		this.activeRequests[requestId].lastEmit = currTime;
+	}
+	
+	if (this.activeRequests[requestId].readOffset === this.size) {
+		//console.log(requestId + ": ended streaming");
+		this.emit(requestId+"end");
+		this.unregister(requestId);
+	}
+	var self = this;
+	process.nextTick(function () {
+		self.emitRequestData(requestId);
+	})
 }
 
 CacheStream.prototype.pause = function (requestId) 
 {
-	this.activeRequests[requestId].paused = true;
+	if (undefined !== this.activeRequests[requestId]) {
+		this.activeRequests[requestId].paused = true;	
+	}
 }
 
 CacheStream.prototype.resume = function (requestId) 
 {
-	this.activeRequests[requestId].paused = false;
+	if (undefined !== this.activeRequests[requestId]) {
+		this.activeRequests[requestId].paused = false;
+		var self = this;
+		process.nextTick(function () {
+			self.emitRequestData(requestId);
+		})		
+	}
 }
 
 CacheStream.prototype.write = function(data) 
@@ -112,7 +118,7 @@ CacheStream.prototype.write = function(data)
 	}
 	this.writeOffset+= writtenBytes;
 	//console.log("wrote " + writtenBytes + " bytes into buffer");
-	//console.log("new offset" + this.writeOffset);		
+	//console.log("new offset" + this.writeOffset);			
 }
 
 CacheStream.prototype.end = function() 
@@ -291,9 +297,9 @@ Cachelicious.prototype = {
 	asyncServeCachedStream: function (cachedStream, contentType, requestId, response)  
 	{
 		var self = this;
-		setTimeout(function () {
+		process.nextTick(function () {
 			self.serveCachedStream(cachedStream, contentType, requestId, response);
-		}, 0);
+		});
 	},
 	
 	serveCachedStream: function (cachedStream, contentType, requestId, response) 
@@ -307,9 +313,8 @@ Cachelicious.prototype = {
 		cachedStream.register(requestId);
 
 		cachedStream.on(requestId+'data', function(data) {
-			//console.log(requestId + ":Streaming data back to client")
-
 			// Pause the read stream when the write stream gets saturated
+			//console.log(requestId + ":Streaming data back to client")
 			if(false === response.write(data)) {
 				//console.log(requestId + ": Pausing stream...")
 				cachedStream.pause(requestId);	
