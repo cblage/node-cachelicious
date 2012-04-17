@@ -236,8 +236,7 @@ Cachelicious.prototype = {
 	{
 		//console.log('request starting...');
 		var filepath = this.basepath,
-		    self = this,
-				headersOnly;
+		    self = this;
 		
 		//TODO: make this configurable with cascading fallbacks
 		if ('/' === request.url) {
