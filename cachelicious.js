@@ -236,22 +236,26 @@ Cachelicious.prototype = {
 	{
 		//console.log('request starting...');
 		var filepath = this.basepath,
-		    self = this;
+		    self = this,
+				headersOnly;
 		
+		//TODO: make this configurable with cascading fallbacks
 		if ('/' === request.url) {
 			filepath += '/index.html';
 		} else {
 			filepath += request.url;
 		}
-		
-		self.servePath(filepath, response);		
+			
+		self.servePath(filepath, request.method, response);		
 	},
 	
-	servePath: function (filepath, response)
+	servePath: function (filepath, method, response)
 	{
-		var extname = path.extname(filepath).toLowerCase(), self = this;
-		var contentType;
+		var extname = path.extname(filepath).toLowerCase(), 
+			self = this,
+			contentType;
 		
+		//TODO: make this configurable
 		switch (extname) {
 			case '.js':
 				contentType = 'text/javascript';
@@ -268,16 +272,16 @@ Cachelicious.prototype = {
 				break;
 		}
 
-		this.streamPath(filepath, contentType, response);
+		this.streamPath(filepath, contentType, method, response);
 	},
 	
-	fileCheck: function (filepath, response, successCb, errorCb) 
+	fileCheck: function (filepath, method, response, successCb, errorCb) 
 	{
 		//console.log('running stat on:' + filepath)
 		var self = this;
 		fs.stat(filepath, function (error, stat) {
 			if (null !== error) {
-				self.serveError(404, response);
+				self.serveError(404, method, response);
 				if (errorCb) {
 					errorCb();
 				}
@@ -285,7 +289,7 @@ Cachelicious.prototype = {
 			}
 
 			if (undefined === stat) {
-				self.serveError(500, response);
+				self.serveError(500, method, response);
 				if (errorCb) {
 					errorCb();
 				}
@@ -293,7 +297,7 @@ Cachelicious.prototype = {
 			}
 
 			if (!stat.isFile()) {
-				self.serveError(401, response);
+				self.serveError(401, method, response);
 				if (errorCb) {
 					errorCb();
 				}				
@@ -303,22 +307,26 @@ Cachelicious.prototype = {
 		});				
 	},
 	
-	uncachedStream: function (filepath, contentType, response)
+	uncachedStream: function (filepath, contentType, method, response)
 	{
-		this.fileCheck(filepath, response, function (stat) {
+		this.fileCheck(filepath, method, response, function (stat) {
 			response.writeHead(200, {
 				'Content-Type':   contentType,
 				'Content-Length': stat.size
 			});
-
-			fs.createReadStream(filepath).pipe(response);						
+			
+			if ('HEAD' !== method) {
+				fs.createReadStream(filepath).pipe(response);
+			} else {
+				response.end();
+			}
 		});
 	},
 	
-	streamPath: function (filepath, contentType, response)
+	streamPath: function (filepath, contentType, method, response)
 	{
 		if (false === this.cache) {
-			this.serveUncachedStream(filepath, contentType, response);
+			this.serveUncachedStream(filepath, contentType, method, response);
 			return;
 		}
 
@@ -330,7 +338,7 @@ Cachelicious.prototype = {
 			self = this;
 
 		if (undefined !== cachedStream) {
-			self.asyncServeCachedStream(cachedStream, contentType, requestId, response);
+			self.asyncServeCachedStream(cachedStream, contentType, method, requestId, response);
 			return;
 		}
 		
@@ -342,51 +350,60 @@ Cachelicious.prototype = {
 				if (undefined !== cachedStream) {
 					//console.log("stopped checker for: " + requestId);
 					clearInterval(lockCheck);
-					self.asyncServeCachedStream(cachedStream, contentType, requestId, response);						
+					self.asyncServeCachedStream(cachedStream, contentType, method, requestId, response);						
 				}
 			}, 5);
 			return;
 		}
 		
 		this.locked[filepath] = true;
-		this.fileCheck(filepath, response, 
+		this.fileCheck(filepath, method, response, 
 			function (stat) {
 				var newStream = new CacheStream(stat.size);
 				self.setCached(filepath, newStream);
 				fs.createReadStream(filepath).pipe(newStream);
 				delete self.locked[filepath];
-				self.asyncServeCachedStream(newStream, contentType, requestId, response);	
+				self.asyncServeCachedStream(newStream, contentType, method, requestId, response);	
 			}, 
 			function () {
 				delete self.locked[filepath];
 			});
 	},
 	
-	asyncServeCachedStream: function (cachedStream, contentType, requestId, response)  
+	asyncServeCachedStream: function (cachedStream, contentType, method, requestId, response)  
 	{
 		var self = this;
 		process.nextTick(function () {
-			self.serveCachedStream(cachedStream, contentType, requestId, response);
+			self.serveCachedStream(cachedStream, contentType, method, requestId, response);
 		});
 	},
 	
-	serveCachedStream: function (cachedStream, contentType, requestId, response) 
+	serveCachedStream: function (cachedStream, contentType, method, requestId, response) 
 	{
 		response.writeHead(200, {
 			'Content-Type':   contentType,
 			'Content-Length': cachedStream.size,
 			'X-Req-Id':       requestId
 		});
-		
-		var consumer = new CacheStreamConsumer(requestId, response);
-		cachedStream.addConsumer(consumer);
+			
+		if ('HEAD' !== method) {
+			cachedStream.addConsumer(new CacheStreamConsumer(requestId, response));
+		} else {
+			response.end();
+		}
 	},
 	
-	serveError: function (code, response) 
+	serveError: function (code, method, response) 
 	{
 		console.log('error:' + code);
 		response.writeHead(code, { 'Content-Type': 'text/html' });
-		response.end(""+code, 'utf-8');		
+		if ('HEAD' !== method) {
+			response.end(""+code, 'utf-8');		
+		} else {
+			response.end();
+		}
+		
+
 	},
 	
 	getCached: function (filepath) 
