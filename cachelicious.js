@@ -29,7 +29,7 @@ var http = require('http');
 var fs = require('fs');
 var path = require('path');
 var strean = require('stream');
-var LRU = require("./vendor/node-lru-cache");
+var LRU = require("lru-cache");
 var util = require("util");
 var events = require("events");
 var stream = require("stream");
@@ -413,7 +413,7 @@ Cachelicious.prototype = {
 	setCached: function (filepath, cacheStream) 
 	{
 		this.cache.set(filepath, cacheStream);
-		//console.log('current cache size:' + this.cache.length);
+		console.log('Current cache size: ' + Math.round(this.cache.length/(1024*1024)) + 'MB');
 	},
 	
 
