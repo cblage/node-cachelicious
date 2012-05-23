@@ -24,10 +24,14 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+if (module) {
+	module.exports = Cachelicious;
+}
+
+
 var http = require('http');
 var fs = require('fs');
 var path = require('path');
-var strean = require('stream');
 var LRU = require("lru-cache");
 var util = require("util");
 var events = require("events");
@@ -180,9 +184,9 @@ CacheStream.prototype.end = function()
 }
 
 
-Cachelicious = function (pathFinder, contentTypeFinder, port, maxCacheSize)
+function Cachelicious (pathFinder, contentTypeFinder, port, maxCacheSize)
 {
-	this.init(pathFinder, port, maxCacheSize)
+	this.init(pathFinder, contentTypeFinder, port, maxCacheSize)
 };
 
 Cachelicious.prototype = {
