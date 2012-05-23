@@ -183,44 +183,47 @@ CacheStream.prototype.end = function()
 	//this.emit('end');
 }
 
+function defaultPathFinder (request)
+{
+	var filepath = './test-assets';
+	if ('/' === request.url) {
+		filepath += '/index.html';
+	} else {
+		filepath += request.url;
+	}
+	return filepath;
+}
+
+function defaultContentTypeFinder (filepath)
+{
+	var extname = path.extname(filepath).toLowerCase();
+	switch (extname) {
+		case '.js':
+			return 'text/javascript';
+		case '.css':
+			return 'text/css';
+		case '.jpeg':
+		case '.jpg':
+			return 'image/jpeg';
+	}
+	return 'text/html';
+}
+
 
 function Cachelicious (pathFinder, contentTypeFinder, port, maxCacheSize)
 {
 	this.init(pathFinder, contentTypeFinder, port, maxCacheSize)
-};
+}
 
 Cachelicious.prototype = {
 	init: function (pathFinder, contentTypeFinder, port, maxCacheSize) 
 	{
 		var self = this;
 		if (typeof pathFinder === 'undefined') {
-			pathFinder = function (request)
-			{
-				var filepath = './test-assets';
-				if ('/' === request.url) {
-					filepath += '/index.html';
-				} else {
-					filepath += request.url;
-				}
-				return filepath;
-			};
-		}
+			pathFinder = defaultPathFinder;
 		
 		if (typeof contentTypeFinder === 'undefined') {
-			contentTypeFinder = function (filepath)
-			{
-				var extname = path.extname(filepath).toLowerCase();
-				switch (extname) {
-					case '.js':
-						return 'text/javascript';
-					case '.css':
-						return 'text/css';
-					case '.jpeg':
-					case '.jpg':
-						return 'image/jpeg';
-				}
-				return 'text/html';
-			};
+			contentTypeFinder = defaultContentTypeFinder;
 		}		
 		
 		if (typeof port === 'undefined') {
