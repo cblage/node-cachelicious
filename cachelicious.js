@@ -181,18 +181,44 @@ CacheStream.prototype.end = function()
 }
 
 
-Cachelicious = function (basepath, port, maxCacheSize)
+Cachelicious = function (pathFinder, contentTypeFinder, port, maxCacheSize)
 {
-	this.init(basepath, port, maxCacheSize)
+	this.init(pathFinder, port, maxCacheSize)
 };
 
 Cachelicious.prototype = {
-	init: function (basepath, port) 
+	init: function (pathFinder, contentTypeFinder, port, maxCacheSize) 
 	{
 		var self = this;
-		if (typeof basepath === 'undefined') {
-			basepath = './test-assets';
+		if (typeof pathFinder === 'undefined') {
+			pathFinder = function (request)
+			{
+				var filepath = './test-assets';
+				if ('/' === request.url) {
+					filepath += '/index.html';
+				} else {
+					filepath += request.url;
+				}
+				return filepath;
+			};
 		}
+		
+		if (typeof contentTypeFinder === 'undefined') {
+			contentTypeFinder = function (filepath)
+			{
+				var extname = path.extname(filepath).toLowerCase();
+				switch (extname) {
+					case '.js':
+						return 'text/javascript';
+					case '.css':
+						return 'text/css';
+					case '.jpeg':
+					case '.jpg':
+						return 'image/jpeg';
+				}
+				return 'text/html';
+			};
+		}		
 		
 		if (typeof port === 'undefined') {
 			port = 9876;
@@ -211,9 +237,10 @@ Cachelicious.prototype = {
 		}
 		
 		this.port = port;
-		this.basepath = basepath;
 		this.requestStreamId = 0;
 		this.locked = {};
+		this.pathFinder = pathFinder;
+		this.contentTypeFinder = contentTypeFinder;
 		
 		this.server = http.createServer(function (request, response) {
 			self.dispatch(request, response);
@@ -234,44 +261,16 @@ Cachelicious.prototype = {
 	
 	dispatch: function (request, response) 
 	{
-		//console.log('request starting...');
-		var filepath = this.basepath,
-		    self = this;
+		var filepath = this.pathFinder(request), contentType;
 		
-		//TODO: make this configurable with cascading fallbacks
-		if ('/' === request.url) {
-			filepath += '/index.html';
-		} else {
-			filepath += request.url;
+		if (null === filepath) {
+			this.serveError(404, request.method, response);
+			return;
 		}
-			
-		self.servePath(filepath, request.method, response);		
-	},
-	
-	servePath: function (filepath, method, response)
-	{
-		var extname = path.extname(filepath).toLowerCase(), 
-			self = this,
-			contentType;
 		
-		//TODO: make this configurable
-		switch (extname) {
-			case '.js':
-				contentType = 'text/javascript';
-				break;
-			case '.css':
-				contentType = 'text/css';
-				break;
-			case '.jpeg':
-			case '.jpg':
-				contentType = 'image/jpeg';
-				break;				
-			default:
-				contentType = 'text/html';
-				break;
-		}
+		contentType = this.contentTypeFinder(filepath);
 
-		this.streamPath(filepath, contentType, method, response);
+		this.streamPath(filepath, contentType, request.method, response);
 	},
 	
 	fileCheck: function (filepath, method, response, successCb, errorCb) 
@@ -306,26 +305,10 @@ Cachelicious.prototype = {
 		});				
 	},
 	
-	uncachedStream: function (filepath, contentType, method, response)
-	{
-		this.fileCheck(filepath, method, response, function (stat) {
-			response.writeHead(200, {
-				'Content-Type':   contentType,
-				'Content-Length': stat.size
-			});
-			
-			if ('HEAD' !== method) {
-				fs.createReadStream(filepath).pipe(response);
-			} else {
-				response.end();
-			}
-		});
-	},
-	
 	streamPath: function (filepath, contentType, method, response)
 	{
 		if (false === this.cache) {
-			this.serveUncachedStream(filepath, contentType, method, response);
+			this.asyncServeUncachedStream(filepath, contentType, method, response);
 			return;
 		}
 
@@ -368,6 +351,23 @@ Cachelicious.prototype = {
 				delete self.locked[filepath];
 			});
 	},
+	
+	asyncServeUncachedStream: function (filepath, contentType, method, response)
+	{
+		this.fileCheck(filepath, method, response, function (stat) {
+			response.writeHead(200, {
+				'Content-Type':   contentType,
+				'Content-Length': stat.size
+			});
+			
+			if ('HEAD' !== method) {
+				fs.createReadStream(filepath).pipe(response);
+			} else {
+				response.end();
+			}
+		});
+	},
+	
 	
 	asyncServeCachedStream: function (cachedStream, contentType, method, requestId, response)  
 	{
