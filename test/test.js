@@ -31,6 +31,8 @@ var cachelicious = require('../lib/cachelicious');
 	var filepath = './assets';
 	if ('/' === request.url) {
 		return 404; //generate a 404 error
+	} else if ('/teapot' === request.url) {
+		return 418; //generate a 418
 	} else {
 		filepath += request.url;
 	}
