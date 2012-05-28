@@ -30,7 +30,7 @@ var cachelicious = require('../lib/cachelicious');
 (new cachelicious(function  (request) {
 	var filepath = './assets';
 	if ('/' === request.url) {
-		return null;
+		return 404; //generate a 404 error
 	} else {
 		filepath += request.url;
 	}
