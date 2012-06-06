@@ -24,10 +24,11 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+"use strict";
 
 var cachelicious = require('../lib/cachelicious');
 
-(new cachelicious(function  (request) {
+(new cachelicious.http(function  (request) {
 	var filepath = './assets';
 	if ('/' === request.url) {
 		return 404; //generate a 404 error
