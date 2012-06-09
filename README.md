@@ -48,6 +48,8 @@ Some test assets are included in the test/assets directory.
 
 You can also try streaming video (and you should :D), like the Big Buck Bunny - http://www.bigbuckbunny.org/index.php/download/
 
+Ranged HTTP requests are fully supported :)
+
 Fast
 -----
 
