@@ -1,6 +1,6 @@
 {
 	"name": "cachelicious",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"author": "Carlos Brito Lage <carlos@carloslage.met>",
 	"description": "Delicious Node.js file stream cacher and HTTP cache server",
 	"main": "lib/cachelicious.js",
