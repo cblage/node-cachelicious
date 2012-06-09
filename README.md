@@ -9,7 +9,7 @@ With Cachelicious it's easier than baking a pie, and almost as delicious as eati
 Installation
 -----------
 
-    node install cachelicious
+    npm install cachelicious
 
 
 FS Cache Usage
