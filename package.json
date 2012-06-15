@@ -20,7 +20,5 @@
 	"devDependencies": {},
 	"bundleDependencies": [ ],
 	"license": "New BSD",
-	"engine": {
-		"node": ">=0.6"
-	}
+	"engine": { "node": ">= 0.6.0" }
 }
