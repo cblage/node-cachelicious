@@ -58,11 +58,11 @@ Ranged HTTP requests are fully supported :)
 Fast
 -----
 
-APIB (http://code.google.com/p/apib/) results serving the 641KB file in the test assets, running on a 2011 MacBook Air i7 1.8GHz (initial status - cold cache):
+[APIB](http://code.google.com/p/apib/) results serving the 641KB file in the test assets, running on a 2011 MacBook Air i7 1.8GHz (initial status - cold cache):
 
 **Standlone HTTP server** *test/http.js*
 
-		apib -d 30 -c 200 -K 2  http://127.0.0.1:9876/medium.jpg
+	apib -d 30 -c 200 -K 2  http://127.0.0.1:9876/medium.jpg
 
 ```
 Duration:             30.004 seconds
