@@ -58,33 +58,36 @@ Ranged HTTP requests are fully supported :)
 Fast
 -----
 
-Apache Bench results serving the 641KB file in the test assets, running on a laptop (initial status - cold cache):
+APIB (http://code.google.com/p/apib/) results serving the 641KB file in the test assets, running the Standlone HTTP server on a 2011 MacBook Air (initial status - cold cache):
+
+	apib -d 30 -c 200 -K 2  http://127.0.0.1:9876/medium.jpg
+
 ```
-Server Software:        Cachelicious/0.0.2
-Server Hostname:        127.0.0.1
-Server Port:            9876
+Duration:             30.004 seconds
+Attempted requests:   53845
+Successful requests:  53845
+Non-200 results:      0
+Connections opened:   200
+Socket errors:        0
 
-Document Path:          /medium.jpg
-Document Length:        656882 bytes
+Throughput:           1794.583 requests/second
+Average latency:      111.210 milliseconds
+Minimum latency:      39.997 milliseconds
+Maximum latency:      243.020 milliseconds
+Latency std. dev:     12.224 milliseconds
+50% latency:          109.000 milliseconds
+90% latency:          124.159 milliseconds
+98% latency:          142.353 milliseconds
+99% latency:          148.804 milliseconds
 
-Concurrency Level:      100
-Time taken for tests:   0.737 seconds
-Complete requests:      1000
-Failed requests:        0
-Write errors:           0
-Total transferred:      657020000 bytes
-HTML transferred:       656882000 bytes
-Requests per second:    1356.47 [#/sec] (mean)
-Time per request:       73.721 [ms] (mean)
-Time per request:       0.737 [ms] (mean, across all concurrent requests)
-Transfer rate:          870340.48 [Kbytes/sec] received
+Client CPU average:    0%
+Client CPU max:        0%
+Client memory usage:    0%
 
-Connection Times (ms)
-              min  mean[+/-sd] median   max
-Connect:        0    2   1.8      2      10
-Processing:    26   70  17.3     67     117
-Waiting:        9   21   6.4     21      42
-Total:         29   72  17.3     69     120
+Total bytes sent:      3.71 megabytes
+Total bytes received:  33792.17 megabytes
+Send bandwidth:        0.99 megabits / second
+Receive bandwidth:     9009.99 megabits / second
 ```
 
 License
