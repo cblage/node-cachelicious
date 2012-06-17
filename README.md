@@ -25,24 +25,29 @@ fsCache.createReadStream(filepath, {start: 2, end: 100}).pipe(destination2);
 
 ```
 
-HTTP Server Usage
+Standalone HTTP Server Usage
 -----
 
 ```js
 var CacheliciousHttp = require('cachelicious').http;
 
-(new CacheliciousHttp(function  (request) {
-	var filepath = '/var/www/foo/';
-	if ('/' === request.url) {
-		return filepath + 'index.html';
-	} else if ('/teapot' === request.url) {
-		return 418; //generate a 418
-	} else {
-		filepath += request.url;
-	}
-	return filepath;
-}, 209715200)).start();	
+//create an HTTP cache server with 20MB to serve files from the assets directory
+(new CacheliciousHttp(20971520, __dirname + '/assets')).listen(9876);	
 ```
+
+Connect Middleware Usage
+-----
+
+```js
+var connect = require('connect'),
+    cacheliciousConnect = require('cachelicious').connect,
+    http = require('http');
+
+var app = connect()
+	.use(cacheliciousConnect(__dirname + '/assets',  {maxCacheSize: 20971520}))
+	.listen(3210);
+```
+
 
 Some test assets are included in the test/assets directory.
 

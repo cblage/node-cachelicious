@@ -1,9 +1,7 @@
 var connect = require('connect'),
-    cachelicious = require('../lib/cachelicious'),
+    cacheliciousConnect = require('../lib/cachelicious').connect,
     http = require('http');
 
 var app = connect()
-	//.use(connect.staticCache())
-	//.use(connect.static(__dirname + '/assets'))
-	.use(cachelicious.connect(__dirname + '/assets'))
+	.use(cacheliciousConnect(__dirname + '/assets',  {maxCacheSize: 20971520}))
 	.listen(3210);
