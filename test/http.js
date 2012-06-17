@@ -28,14 +28,4 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 var cachelicious = require('../lib/cachelicious');
 
-(new cachelicious.http(209715200, function  (request) {
-	var filepath = './assets';
-	if ('/' === request.url) {
-		return 404; //generate a 404 error
-	} else if ('/teapot' === request.url) {
-		return 418; //generate a 418
-	} else {
-		filepath += request.url;
-	}
-	return filepath;
-})).listen(9876);	
+(new cachelicious.http(209715200, __dirname + '/assets')).listen(9876);	
