@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta name="description" content="Cachelicious : Delicious Node.js file stream cacher and HTTP cache server" />
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Cachelicious</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/cblage/node-cachelicious">View on GitHub</a>
+
+          <h1 id="project_title">Cachelicious</h1>
+          <h2 id="project_tagline">Delicious Node.js file stream cacher and HTTP cache server</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/cblage/node-cachelicious/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/cblage/node-cachelicious/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <p>Who said caching and serving cached files should be a chore? </p>
+
+<p>With Cachelicious it's easier than baking a pie, and almost as delicious as eating it. Mmmmm, pie.... <em>drool</em></p>
+
+<h2>Installation</h2>
+
+<pre><code>npm install cachelicious
+</code></pre>
+
+<h2>FS Cache Usage</h2>
+
+<div class="highlight">
+<pre><span class="kd">var</span> <span class="nx">CacheliciousFs</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">'cachelicious'</span><span class="p">).</span><span class="nx">fs</span><span class="p">;</span>
+<span class="kd">var</span> <span class="nx">fsCache</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">CacheliciousFs</span><span class="p">(</span><span class="mi">20971520</span><span class="p">);</span> <span class="c1">//20MB of cache</span>
+
+<span class="nx">fsCache</span><span class="p">.</span><span class="nx">createReadStream</span><span class="p">(</span><span class="nx">filepath</span><span class="p">,</span> <span class="nx">options</span><span class="p">).</span><span class="nx">pipe</span><span class="p">(</span><span class="nx">destination1</span><span class="p">);</span>
+<span class="nx">fsCache</span><span class="p">.</span><span class="nx">createReadStream</span><span class="p">(</span><span class="nx">filepath</span><span class="p">,</span> <span class="p">{</span><span class="nx">start</span><span class="o">:</span> <span class="mi">2</span><span class="p">,</span> <span class="nx">end</span><span class="o">:</span> <span class="mi">100</span><span class="p">}).</span><span class="nx">pipe</span><span class="p">(</span><span class="nx">destination2</span><span class="p">);</span>
+<span class="c1">//both will stream from the same cache :)</span>
+
+</pre>
+</div>
+
+
+<h2>Standalone HTTP Server Usage</h2>
+
+<div class="highlight">
+<pre><span class="kd">var</span> <span class="nx">CacheliciousHttp</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">'cachelicious'</span><span class="p">).</span><span class="nx">http</span><span class="p">;</span>
+
+<span class="c1">//create an HTTP cache server with 20MB to serve files from the assets directory</span>
+<span class="p">(</span><span class="k">new</span> <span class="nx">CacheliciousHttp</span><span class="p">(</span><span class="mi">20971520</span><span class="p">,</span> <span class="nx">__dirname</span> <span class="o">+</span> <span class="s1">'/assets'</span><span class="p">)).</span><span class="nx">listen</span><span class="p">(</span><span class="mi">9876</span><span class="p">);</span>   
+</pre>
+</div>
+
+
+<h2>Connect Middleware Usage</h2>
+
+<div class="highlight">
+<pre><span class="kd">var</span> <span class="nx">connect</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">'connect'</span><span class="p">),</span>
+    <span class="nx">cacheliciousConnect</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">'cachelicious'</span><span class="p">).</span><span class="nx">connect</span><span class="p">,</span>
+    <span class="nx">http</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">'http'</span><span class="p">);</span>
+
+<span class="kd">var</span> <span class="nx">app</span> <span class="o">=</span> <span class="nx">connect</span><span class="p">()</span>
+    <span class="p">.</span><span class="nx">use</span><span class="p">(</span><span class="nx">cacheliciousConnect</span><span class="p">(</span><span class="nx">__dirname</span> <span class="o">+</span> <span class="s1">'/assets'</span><span class="p">,</span>  <span class="p">{</span><span class="nx">maxCacheSize</span><span class="o">:</span> <span class="mi">20971520</span><span class="p">}))</span>
+    <span class="p">.</span><span class="nx">listen</span><span class="p">(</span><span class="mi">3210</span><span class="p">);</span>
+</pre>
+</div>
+
+
+<p>Some test assets are included in the test/assets directory.</p>
+
+<p>You can also try streaming video (and you should :D), like the Big Buck Bunny - <a href="http://www.bigbuckbunny.org/index.php/download/">http://www.bigbuckbunny.org/index.php/download/</a></p>
+
+<p>Ranged HTTP requests are fully supported :)</p>
+
+<h2>Fast</h2>
+
+<p><a href="http://code.google.com/p/apib/">APIB</a> results serving the 641KB file in the test assets, running on a 2011 MacBook Air i7 1.8GHz (initial status - cold cache):</p>
+
+<p><strong>Standlone HTTP server</strong> <em>test/http.js</em></p>
+
+<pre><code>apib -d 30 -c 200 -K 2  http://127.0.0.1:9876/medium.jpg
+</code></pre>
+
+<pre><code>Duration:             30.004 seconds
+Attempted requests:   53845
+Successful requests:  53845
+Non-200 results:      0
+Connections opened:   200
+Socket errors:        0
+
+Throughput:           1794.583 requests/second
+Average latency:      111.210 milliseconds
+Minimum latency:      39.997 milliseconds
+Maximum latency:      243.020 milliseconds
+Latency std. dev:     12.224 milliseconds
+50% latency:          109.000 milliseconds
+90% latency:          124.159 milliseconds
+98% latency:          142.353 milliseconds
+99% latency:          148.804 milliseconds
+
+Client CPU average:    0%
+Client CPU max:        0%
+Client memory usage:    0%
+
+Total bytes sent:      3.71 megabytes
+Total bytes received:  33792.17 megabytes
+Send bandwidth:        0.99 megabits / second
+Receive bandwidth:     9009.99 megabits / second
+</code></pre>
+
+<p><strong>Cachelicious Connect Middleware</strong> <em>test/connect.js</em></p>
+
+<pre><code>apib -d 30 -c 200 -K 2  http://127.0.0.1:3210/medium.jpg
+</code></pre>
+
+<pre><code>Duration:             30.004 seconds
+Attempted requests:   49598
+Successful requests:  49598
+Non-200 results:      0
+Connections opened:   200
+Socket errors:        0
+
+Throughput:           1653.028 requests/second
+Average latency:      120.535 milliseconds
+Minimum latency:      46.361 milliseconds
+Maximum latency:      572.141 milliseconds
+Latency std. dev:     31.452 milliseconds
+50% latency:          115.357 milliseconds
+90% latency:          137.229 milliseconds
+98% latency:          161.885 milliseconds
+99% latency:          194.394 milliseconds
+
+Client CPU average:    0%
+Client CPU max:        0%
+Client memory usage:    0%
+
+Total bytes sent:      3.42 megabytes
+Total bytes received:  31150.77 megabytes
+Send bandwidth:        0.91 megabits / second
+Receive bandwidth:     8305.67 megabits / second
+</code></pre>
+
+<p><strong>Static + Static Cache Connect Middleware</strong> <em>test/connectStatic.js</em></p>
+
+<pre><code>apib -d 30 -c 200 -K 2  http://127.0.0.1:4321/medium.jpg
+</code></pre>
+
+<pre><code>Duration:             30.004 seconds
+Attempted requests:   15000
+Successful requests:  15000
+Non-200 results:      0
+Connections opened:   200
+Socket errors:        0
+
+Throughput:           499.940 requests/second
+Average latency:      398.803 milliseconds
+Minimum latency:      371.709 milliseconds
+Maximum latency:      525.252 milliseconds
+Latency std. dev:     24.629 milliseconds
+50% latency:          390.023 milliseconds
+90% latency:          431.956 milliseconds
+98% latency:          475.991 milliseconds
+99% latency:          505.020 milliseconds
+
+Client CPU average:    0%
+Client CPU max:        0%
+Client memory usage:    0%
+
+Total bytes sent:      1.04 megabytes
+Total bytes received:  9410.90 megabytes
+Send bandwidth:        0.28 megabits / second
+Receive bandwidth:     2509.27 megabits / second
+</code></pre>
+
+<h2>License</h2>
+
+<p><a href="https://github.com/cblage/node-cachelicious/blob/master/LICENSE">New BSD License</a> </p>
+
+<h2>Contributing</h2>
+
+<p>Pull requests are welcome! I'll try to merge all valuable contributions and credit the author when I do so.</p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Cachelicious maintained by <a href="https://github.com/cblage">cblage</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+              <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-721334-5");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
+
+  </body>
+</html>
